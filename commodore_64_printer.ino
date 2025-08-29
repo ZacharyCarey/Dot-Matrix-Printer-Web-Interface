@@ -41,6 +41,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <WiFi.h>
+#include "ESPAsyncWebServer.h"
+#include "WebSocketsServer.h"
+
 // CONSTANTS
 
 // Mapping of CBM-64's serial port lines to Arduino's digital I/O pins.
@@ -63,7 +67,7 @@ int CBM_PRN_ADDR_2 = CMB_PRN_MODE_GRAPHIC; // 2nd addr = printer mode.
 int TEST_MODE = -1;
 const int DATA_MAX_LENGTH = 1000;
 char data[DATA_MAX_LENGTH];
-int index = -1;
+int data_index = -1;
 
 // FUNCTIONS
 
@@ -349,31 +353,31 @@ void loop()
     }
     else if (TEST_MODE == 2)
     {
-      if (index == -1)
+      if (data_index == -1)
       { // If user message test mode selected, ask it now.
         Serial.println("Type text to be printed (# ends):");
-        index++;
+        data_index++;
       }
       else
       {
         if ( val == '#' )
         {
-          data[index] = '\0';
+          data[data_index] = '\0';
           cbm_println(data);
           Serial.println("Done.");
-          index = -1;
+          data_index = -1;
           TEST_MODE = 0;
           test_menu();
         }
-        else if (index < DATA_MAX_LENGTH)
+        else if (data_index < DATA_MAX_LENGTH)
         {
-          data[index] = val;
-          index++;
-          if (index + 1 >= DATA_MAX_LENGTH)
+          data[data_index] = val;
+          data_index++;
+          if (data_index + 1 >= DATA_MAX_LENGTH)
           {
-            data[index] = '\0';
+            data[data_index] = '\0';
             cbm_print(data, DATA_MAX_LENGTH);
-            index = 0;
+            data_index = 0;
           }
         }
       }
