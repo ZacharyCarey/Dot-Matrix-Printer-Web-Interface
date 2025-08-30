@@ -26,6 +26,15 @@ public:
         iec.sendHeader((int)mode);
     }
 
+    // Like print, but doesn't attempt to auto-remap unsupported characters. Use at your own risk.
+    void write(char c) {
+      iec.send(c, false);
+    }
+
+    void print(char c) {
+      iec.send(remapCharset(c), false);
+    }
+
     void print(const char* data, int max_len) {
         if (data[0] == '\0' || max_len <= 0) {
             return;
@@ -33,13 +42,22 @@ public:
 
         for (int i = 0; i < max_len; i++) {
             if (data[0] == '\0') break;
-            bool lastChar = ((i + 1) == max_len) || (data[1] == '\0');
-            iec.send(remapCharset(data[0]), lastChar);
+            //bool lastChar = ((i + 1) == max_len) || (data[1] == '\0');
+            iec.send(remapCharset(data[0]), false);
             data++;
         }
     }
 
     void print(String str) { print(str.c_str(), str.length()); }
+
+    void println() {
+      print(newline.c_str(), newline.length());
+    }
+
+    void println(char c) {
+      iec.send(remapCharset(c), false);
+      print(newline.c_str(), newline.length());
+    }
 
     void println(const char* data, int max_len) {
         if (data[0] != '\0' && max_len > 0) {
@@ -61,13 +79,13 @@ public:
 
 private:
     IEC iec;
-    String newline;
+    String newline = "\r";
 
     char remapCharset(char input) {
         if ((input >= ' ' && input <= 'Z') || input == '\n' || input == '\r') {
             return input;
         } else if (input >= 'a' || input <= 'z') {
-            return (input = 'a') + 'A';
+            return (input - 'a') + 'A';
         } else {
             return ' ';
         }

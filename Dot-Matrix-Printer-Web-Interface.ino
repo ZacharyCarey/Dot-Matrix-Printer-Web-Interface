@@ -14,6 +14,38 @@ const int DATA_MAX_LENGTH = 1000;
 char data[DATA_MAX_LENGTH];
 int data_index = -1;
 
+void printSelfTest() {
+  cbm.println("Hello World, here are the chars supported by the printer:");
+  cbm.println();
+  for (int i=0; i<16; i++)
+  {
+    cbm.write(i+32);
+    cbm.write(' ');
+    cbm.write(i+48);
+    cbm.write(' ');
+    cbm.write(i+64);
+    cbm.write(' ');
+    cbm.write(i+80);
+    cbm.write(' ');
+    cbm.write(i+96);
+    cbm.write(' ');
+    cbm.write(i+112);
+    cbm.print("    ");
+    cbm.write(i+160);
+    cbm.write(' ');
+    cbm.write(i+176);
+    cbm.write(' ');
+    cbm.write(i+192);
+    cbm.write(' ');
+    cbm.write(i+200);
+    cbm.write(' ');
+    cbm.write(i+224);
+    cbm.write(' ');
+    cbm.write(i+240);
+    cbm.println();
+  }
+}
+
 // For testing, print menu to computer.
 void test_menu()
 {
@@ -29,7 +61,7 @@ void setup()
   Serial.begin(115200);
 
   Serial.println("Initializing printer...");
-  cbm.begin(PrintMode::Business);
+  cbm.begin(PrintMode::Graphic);
   cbm.setNewline("\r\n");
   Serial.println("ready!");
 
@@ -59,7 +91,7 @@ void loop()
     if (TEST_MODE == 1)
     { // If self test mode selected, do self test now.
       Serial.println("Now printing...");
-      //cbm.printSelfTest();
+      printSelfTest();
       Serial.println("Done.");
       TEST_MODE = 0;
       test_menu();
@@ -89,7 +121,7 @@ void loop()
           if (data_index + 1 >= DATA_MAX_LENGTH)
           {
             data[data_index] = '\0';
-            cbm.print(data, DATA_MAX_LENGTH);
+            cbm.println(data, DATA_MAX_LENGTH);
             data_index = 0;
           }
         }
