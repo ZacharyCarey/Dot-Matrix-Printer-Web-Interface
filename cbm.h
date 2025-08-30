@@ -268,25 +268,43 @@ private:
     // Writes one byte to CBM serial line (LSB first, MSB last).
     void cbm_serial_write_byte(unsigned char data)
     {
-        // cbm_serial_write_bit( data       & 0x01); // 1st bit (LSB)
-        // cbm_serial_write_bit((data >> 1) & 0x01); // 2nd bit
-        // cbm_serial_write_bit((data >> 2) & 0x01); // 3rd bit
-        // cbm_serial_write_bit((data >> 3) & 0x01); // 4th bit
-        // cbm_serial_write_bit((data >> 4) & 0x01); // 5th bit
-        // cbm_serial_write_bit((data >> 5) & 0x01); // 6th bit
-        // cbm_serial_write_bit((data >> 6) & 0x01); // 7th bit
-        // cbm_serial_write_bit((data >> 7) & 0x01); // 8th bit (MSB)
+        cbm_serial_write_bit( data       & 0x01); // 1st bit (LSB)
+        cbm_serial_write_bit((data >> 1) & 0x01); // 2nd bit
+        cbm_serial_write_bit((data >> 2) & 0x01); // 3rd bit
+        cbm_serial_write_bit((data >> 3) & 0x01); // 4th bit
+        cbm_serial_write_bit((data >> 4) & 0x01); // 5th bit
+        cbm_serial_write_bit((data >> 5) & 0x01); // 6th bit
+        cbm_serial_write_bit((data >> 6) & 0x01); // 7th bit
+        cbm_serial_write_bit((data >> 7) & 0x01); // 8th bit (MSB)
 
         // 1st bit (data & 0x01) is LSB
         // 8th bit (data & 0x80) is MSB
-        for (int i = 0; i < 8; i++) {
-            cbm_serial_write_bit((data >> i) & 0x01);
-        }
+        //for (int i = 0; i < 8; i++) {
+        //    cbm_serial_write_bit((data >> i) & 0x01);
+        //}
     }
 
     // Switches case for alpha values (they must be reversed).
     int cbm_switch_case(char data)
     {
+      // TODO add support for lower-case data
+      // this lookup is designed around the okidata 120. 
+      // It may vary for other printers
+
+      // convert special chars to spaces
+      if (data < 32) {
+        return 32;
+      }
+
+      if (data >= 'a' && data <= 'z') {
+        // convert to upper case
+        return data - 32;
+      }
+
+      // data > 'z'
+      return 113;
+
+      /*
         if (data >= 0x41 && data <= 0x5A)
         { // Convert from lower to upper (a->A)
             return data + 32;
@@ -299,6 +317,7 @@ private:
         { // Not an alpha value, no conversion needed
             return data;
         }
+      */
     }
 };
 
