@@ -2,11 +2,11 @@
 //#include "ESPAsyncWebServer.h"
 //#include "WebSocketsServer.h"
 
-#include "cbm.h"
+#include "okidata_120.h"
 
 // Mapping of CBM-64's serial port lines to Arduino's digital I/O pins.
 // With Brother HR-5C, we need to be able to read only the data line.
-CBM cbm(7, 8, 10, 11, 12);
+Okidata120 cbm(7, 8, 10, 11);
 
 // For testing:
 int TEST_MODE = -1;
@@ -29,11 +29,12 @@ void setup()
   Serial.begin(115200);
 
   Serial.println("Initializing printer...");
-  cbm.begin(PrintMode::Graphic);
+  cbm.begin(PrintMode::Business);
   cbm.setNewline("\r\n");
   Serial.println("ready!");
 
   // Print test menu.
+  cbm.println("Hello, world!");
   test_menu();
 }
 
@@ -58,7 +59,7 @@ void loop()
     if (TEST_MODE == 1)
     { // If self test mode selected, do self test now.
       Serial.println("Now printing...");
-      cbm.printSelfTest();
+      //cbm.printSelfTest();
       Serial.println("Done.");
       TEST_MODE = 0;
       test_menu();
