@@ -1,0 +1,1 @@
+Copy the libraries from /libs into the Arduino sketchbook library folder.
