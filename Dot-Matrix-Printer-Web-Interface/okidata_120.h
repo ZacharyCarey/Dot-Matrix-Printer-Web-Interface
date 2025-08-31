@@ -14,7 +14,6 @@ class Okidata120
 {
 public:
     Okidata120(int attention_pin, int reset_pin, int clock_pin, int data_pin) 
-    : iec(attention_pin, reset_pin, clock_pin, data_pin)
     {
     }
 

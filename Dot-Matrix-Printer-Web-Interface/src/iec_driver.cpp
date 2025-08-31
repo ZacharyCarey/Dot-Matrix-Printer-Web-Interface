@@ -32,29 +32,23 @@ using namespace CBM;
 // See timeoutWait below.
 #define TIMEOUT  65000
 
-IEC::IEC(int attention_pin, int reset_pin, int clock_pin, int data_pin)
+IEC::IEC()
 #ifdef DEBUGLINES
 : m_lastMillis(0)
 #endif
 {
 	m_state = noFlags;
-
-	m_atnPin = attention_pin;
-	m_dataPin = data_pin;
-	m_clockPin = clock_pin;
-	//m_srqInPin = 
-	m_resetPin = reset_pin;
 } // ctor
 
 
-byte IEC::timeoutWait(byte waitBit, boolean whileHigh)
+byte IEC::timeoutWait(PinPair* waitBit, boolean whileHigh)
 {
 	word t = 0;
 	boolean c;
 
 	while(t < TIMEOUT) {
 		// Check the waiting condition:
-		c = readPIN(waitBit);
+		c = waitBit->read();
 
 		if(whileHigh)
 			c = not c;
@@ -68,13 +62,13 @@ byte IEC::timeoutWait(byte waitBit, boolean whileHigh)
 
 	// If down here, we have had a timeout.
 	// Release lines and go to inactive state with error flag
-	writeCLOCK(false);
-	writeDATA(false);
+	this->m_clockPin.write(false);
+	this->m_dataPin.write(false);
 
 	m_state = errorFlag;
 
 	// Wait for ATN release, problem might have occured during attention
-	while(not readATN());
+	while(!this->m_atnPin.read());
 
 	// Note: The while above is without timeout. If ATN is held low forever,
 	//       the CBM is out in the woods and needs a reset anyways.
@@ -94,15 +88,15 @@ byte IEC::receiveByte(void)
 	m_state = noFlags;
 
 	// Wait for talker ready
-	if(timeoutWait(m_clockPin, false))
+	if(timeoutWait(&m_clockPin, false))
 		return 0;
 
 	// Say we're ready
-	writeDATA(false);
+	this->m_dataPin.write(false);
 
 	// Record how long CLOCK is high, more than 200 us means EOI
 	byte n = 0;
-	while(readCLOCK() and (n < 20)) {
+	while(this->m_clockPin.read() and (n < 20)) {
 		delayMicroseconds(10);  // this loop should cycle in about 10 us...
 		n++;
 	}
@@ -112,32 +106,32 @@ byte IEC::receiveByte(void)
 		m_state or_eq eoiFlag;
 
 		// Acknowledge by pull down data more than 60 us
-		writeDATA(true);
+		this->m_dataPin.write(true);
 		delayMicroseconds(TIMING_BIT);
-		writeDATA(false);
+		this->m_dataPin.write(false);
 
 		// but still wait for clk
-		if(timeoutWait(m_clockPin, true))
+		if(timeoutWait(&m_clockPin, true))
 			return 0;
 	}
 
 	// Sample ATN
-	if(false == readATN())
+	if(this->m_atnPin.read() == false)
 		m_state or_eq atnFlag;
 
 	byte data = 0;
 	// Get the bits, sampling on clock rising edge:
 	for(n = 0; n < 8; n++) {
 		data >>= 1;
-		if(timeoutWait(m_clockPin, false))
+		if(timeoutWait(&m_clockPin, false))
 			return 0;
-		data or_eq (readDATA() ? (1 << 7) : 0);
-		if(timeoutWait(m_clockPin, true))
+		data or_eq (this->m_dataPin.read() ? (1 << 7) : 0);
+		if(timeoutWait(&m_clockPin, true))
 			return 0;
 	}
 
 	// Signal we accepted data:
-	writeDATA(true);
+	this->m_dataPin.write(true);
 
 	return data;
 } // receiveByte
@@ -151,14 +145,14 @@ byte IEC::receiveByte(void)
 boolean IEC::sendByte(byte data, boolean signalEOI)
 {
 	// Listener must have accepted previous data
-	if(timeoutWait(m_dataPin, true))
+	if(timeoutWait(&m_dataPin, true))
 		return false;
 
 	// Say we're ready
-	writeCLOCK(false);
+	this->m_clockPin.write(false);
 
 	// Wait for listener to be ready
-	if(timeoutWait(m_dataPin, false))
+	if(timeoutWait(&m_dataPin, false))
 		return false;
 
 	if(signalEOI) {
@@ -168,10 +162,10 @@ boolean IEC::sendByte(byte data, boolean signalEOI)
 		delayMicroseconds(TIMING_EOI_WAIT);
 
 		// get eoi acknowledge:
-		if(timeoutWait(m_dataPin, true))
+		if(timeoutWait(&m_dataPin, true))
 			return false;
 
-		if(timeoutWait(m_dataPin, false))
+		if(timeoutWait(&m_dataPin, false))
 			return false;
 	}
 
@@ -181,19 +175,19 @@ boolean IEC::sendByte(byte data, boolean signalEOI)
 	for(byte n = 0; n < 8; n++) {
 		// FIXME: Here check whether data pin goes low, if so end (enter cleanup)!
 
-		writeCLOCK(true);
+		this->m_clockPin.write(true);
 		// set data
-		writeDATA((data bitand 1) ? false : true);
+		this->m_dataPin.write((data bitand 1) ? false : true);
 
 		delayMicroseconds(TIMING_BIT);
-		writeCLOCK(false);
+		this->m_clockPin.write(false);
 		delayMicroseconds(TIMING_BIT);
 
 		data >>= 1;
 	}
 
-	writeCLOCK(true);
-	writeDATA(false);
+	this->m_clockPin.write(true);
+	this->m_dataPin.write(false);
 
 	// FIXME: Maybe make the following ending more like sd2iec instead.
 
@@ -201,7 +195,7 @@ boolean IEC::sendByte(byte data, boolean signalEOI)
 	delayMicroseconds(TIMING_STABLE_WAIT);
 
 	// Wait for listener to accept data
-	if(timeoutWait(m_dataPin, true))
+	if(timeoutWait(&m_dataPin, true))
 		return false;
 
 	return true;
@@ -212,12 +206,12 @@ boolean IEC::sendByte(byte data, boolean signalEOI)
 boolean IEC::turnAround(void)
 {
 	// Wait until clock is released
-	if(timeoutWait(m_clockPin, false))
+	if(timeoutWait(&m_clockPin, false))
 		return false;
 
-	writeDATA(false);
+	this->m_dataPin.write(false);
 	delayMicroseconds(TIMING_BIT);
-	writeCLOCK(true);
+	this->m_clockPin.write(true);
 	delayMicroseconds(TIMING_BIT);
 
 	return true;
@@ -228,13 +222,13 @@ boolean IEC::turnAround(void)
 // (the way it was when the computer was switched on)
 boolean IEC::undoTurnAround(void)
 {
-	writeDATA(true);
+	this->m_dataPin.write(true);
 	delayMicroseconds(TIMING_BIT);
-	writeCLOCK(false);
+	this->m_clockPin.write(false);
 	delayMicroseconds(TIMING_BIT);
 
 	// wait until the computer releases the clock line
-	if(timeoutWait(m_clockPin, true))
+	if(timeoutWait(&m_clockPin, true))
 		return false;
 
 	return true;
@@ -258,10 +252,10 @@ IEC::ATNCheck IEC::checkATN(ATNCmd& cmd)
 	ATNCheck ret = ATN_IDLE;
 	byte i = 0;
 
-	if(not readATN()) {
+	if(!this->m_atnPin.read()) {
 		// Attention line is active, go to listener mode and get message. Being fast with the next two lines here is CRITICAL!
-		writeDATA(true);
-		writeCLOCK(false);
+		this->m_dataPin.write(true);
+		this->m_clockPin.write(false);
 		delayMicroseconds(TIMING_ATN_PREDELAY);
 
 		// Get first ATN byte, it is either LISTEN or TALK
@@ -313,8 +307,8 @@ IEC::ATNCheck IEC::checkATN(ATNCmd& cmd)
 				return ATN_ERROR;
 			cmd.code = c;
 
-			while(not readATN()) {
-				if(readCLOCK()) {
+			while(!this->m_atnPin.read()) {
+				if(this->m_clockPin.read()) {
 					c = (ATNCommand)receiveByte();
 					if(m_state bitand errorFlag)
 						return ATN_ERROR;
@@ -339,8 +333,8 @@ IEC::ATNCheck IEC::checkATN(ATNCmd& cmd)
 		else {
 			// Either the message is not for us or insignificant, like unlisten.
 			delayMicroseconds(TIMING_ATN_DELAY);
-			writeDATA(false);
-			writeCLOCK(false);
+			this->m_dataPin.write(false);
+			this->m_clockPin.write(false);
 			//			{
 			//				char buffer[20];
 			//				sprintf(buffer, "NOTUS: %u", c);
@@ -348,14 +342,14 @@ IEC::ATNCheck IEC::checkATN(ATNCmd& cmd)
 			//			}
 
 			// Wait for ATN to release and quit
-			while(not readATN());
+			while(!this->m_atnPin.read());
 			//Log(Information, FAC_IEC, "ATNREL");
 		}
 	}
 	else {
 		// No ATN, keep lines in a released state.
-		writeDATA(false);
-		writeCLOCK(false);
+		this->m_dataPin.write(false);
+		this->m_clockPin.write(false);
 	}
 
 	// some delay is required before more ATN business can take place.
@@ -370,7 +364,7 @@ boolean IEC::checkRESET()
 {
 	//	return false;
 	//	// hmmm. Is this all todo?
-	return readRESET();
+	return this->m_resetPin.read();
 } // checkATN
 
 
@@ -403,8 +397,8 @@ boolean IEC::send(byte data, boolean isLastByte)
 boolean IEC::sendFNF()
 {
 	// Message file not found by just releasing lines
-	writeDATA(false);
-	writeCLOCK(false);
+	this->m_dataPin.write(false);
+	this->m_clockPin.write(false);
 
 	// Hold back a little...
 	delayMicroseconds(TIMING_FNF_DELAY);
@@ -420,26 +414,16 @@ boolean IEC::begin(byte deviceNumber)
 	m_deviceNumber = deviceNumber;
 
 	// make sure the output states are initially LOW.
-	/*pinMode(m_atnPin, OUTPUT);
-	pinMode(m_dataPin, OUTPUT);
-	pinMode(m_clockPin, OUTPUT);
-	digitalWrite(m_atnPin, false);
-	digitalWrite(m_dataPin, false);
-	digitalWrite(m_clockPin, false);*/
+	this->m_srqInPin.begin();
+	this->m_atnPin.begin();
+	this->m_resetPin.begin();
+	this->m_clockPin.begin();
+	this->m_dataPin.begin();
 
 #ifdef RESET_C64
 	pinMode(m_resetPin, OUTPUT);
 	digitalWrite(m_resetPin, false);	// only early C64's could be reset by a slave going high.
 #endif
-
-	// initial pin modes in GPIO.
-	// lines are active-low, so use a pullup to detect other
-	// devices pulling the line low
-	pinMode(m_atnPin, INPUT_PULLUP);
-	pinMode(m_dataPin, INPUT_PULLUP);
-	pinMode(m_clockPin, INPUT_PULLUP);
-	pinMode(m_resetPin, INPUT_PULLUP);
-	pinMode(m_srqInPin, INPUT_PULLUP);
 
 #ifdef DEBUGLINES
 	m_lastMillis = millis();
@@ -463,7 +447,7 @@ void IEC::testINPUTS()
 		m_lastMillis = now;
 		char buffer[80];
 		sprintf(buffer, "Lines, ATN: %s CLOCK: %s DATA: %s",
-						(readATN() ? "HIGH" : "LOW"), (readCLOCK() ? "HIGH" : "LOW"), (readDATA() ? "HIGH" : "LOW"));
+						(this->m_atnPin.read() ? "HIGH" : "LOW"), (this->m_clockPin.read() ? "HIGH" : "LOW"), (this->m_dataPin.read() ? "HIGH" : "LOW"));
 		Log(Information, FAC_IEC, buffer);
 	}
 } // testINPUTS
@@ -479,8 +463,8 @@ void IEC::testOUTPUTS()
 		char buffer[80];
 		sprintf(buffer, "Lines: CLOCK: %s DATA: %s", (lowOrHigh ? "HIGH" : "LOW"), (lowOrHigh ? "HIGH" : "LOW"));
 		Log(Information, FAC_IEC, buffer);
-		writeCLOCK(lowOrHigh);
-		writeDATA(lowOrHigh);
+		this->m_clockPin.write(lowOrHigh);
+		this->m_dataPin.write(lowOrHigh);
 		lowOrHigh xor_eq true;
 	}
 } // testOUTPUTS

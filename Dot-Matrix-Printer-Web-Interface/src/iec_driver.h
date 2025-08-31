@@ -5,6 +5,44 @@
 #include "global_defines.h"
 #include "cbmdefines.h"
 
+class PinPair 
+{
+public:
+	PinPair(int input, int output) 
+	{
+		this->pin_input = input;
+		this->pin_output = output;
+	}
+
+	void begin() 
+	{
+		pinMode(this->pin_input, INPUT);
+		pinMode(this->pin_output, OUTPUT);
+		digitalWrite(this->pin_output, LOW);
+	}
+
+	// FALSE = float bus high
+	// TRUE = pull bus low
+	inline void write(bool state) {
+		digitalWrite(this->pin_output, state);
+	}
+
+	inline int read() {
+		digitalRead(this->pin_input);
+	}
+
+private:
+	PinPair();
+
+	// Pin used to control the data line
+	// Writing LOW lets the bus float HIGH
+	// Writing HIGH pulls the bus LOW
+	int pin_output;
+
+	// Pin used to read the state of the bus
+	// Read the real state, LOW or HIGH
+	int pin_input;
+};
 
 class IEC
 {
@@ -49,8 +87,7 @@ public:
 		byte strLen;
 	} ATNCmd;
 
-	IEC() {}
-	IEC(int attention_pin, int reset_pin, int clock_pin, int data_pin);
+	IEC();
 	~IEC()
 	{ }
 
@@ -68,17 +105,17 @@ public:
 	boolean checkRESET();
 
 	boolean sendReset() {
-		writePIN(m_resetPin, true);
+		this->m_resetPin.write(true);
 		delay(100);
-		writePIN(m_resetPin, false);
+		this->m_resetPin.write(false);
 		delay(3000); // give time for device to reset
 	}
 
 	bool sendHeader(byte mode) {
 		// Header begins, write ACK
-		writeATN(true);
+		this->m_atnPin.write(true);
 		delayMicroseconds(2000);
-		writeCLOCK(true);
+		this->m_clockPin.write(true);
 		delayMicroseconds(2000);
 
 		// Write listener address
@@ -89,7 +126,7 @@ public:
 
 		// End header
 		delayMicroseconds(20);
-		writeATN(false);
+		this->m_atnPin.write(false);
 	}
 
 	// Sends a byte. The communication must be in the correct state: a load command
@@ -115,7 +152,7 @@ public:
 #endif
 
 private:
-	byte timeoutWait(byte waitBit, boolean whileHigh);
+	byte timeoutWait(PinPair* waitBit, boolean whileHigh);
 	byte receiveByte(void);
 	boolean sendByte(byte data, boolean signalEOI);
 	boolean turnAround(void);
@@ -125,69 +162,12 @@ private:
 	byte m_state;
 	byte m_deviceNumber;
 
-	byte m_atnPin;
-	byte m_dataPin;
-	byte m_clockPin;
-	byte m_srqInPin;
-	byte m_resetPin;
-
-		inline boolean readPIN(byte pinNumber)
-	{
-		// To be able to read line we must be set to input, not driving.
-		pinMode(pinNumber, INPUT_PULLUP);
-		return digitalRead(pinNumber) ? true : false;
-	}
-
-	inline boolean readATN()
-	{
-		return readPIN(m_atnPin);
-	}
-
-	inline boolean readDATA()
-	{
-		return readPIN(m_dataPin);
-	}
-
-	inline boolean readCLOCK()
-	{
-		return readPIN(m_clockPin);
-	}
-
-	inline boolean readRESET()
-	{
-		return !readPIN(m_resetPin);
-	}
-
-//	inline boolean readSRQIN()
-//	{
-//		return readPIN(m_srqInPin);
-//	}
-
-	// true == PULL == HIGH, false == RELEASE == LOW
-	inline void writePIN(byte pinNumber, boolean state)
-	{
-		if (state) {
-			digitalWrite(pinNumber, LOW);
-			pinMode(pinNumber, OUTPUT);
-		} else {
-			pinMode(pinNumber, INPUT_PULLUP);
-		}
-	}
-
-	inline void writeATN(boolean state)
-	{
-		writePIN(m_atnPin, state);
-	}
-
-	inline void writeDATA(boolean state)
-	{
-		writePIN(m_dataPin, state);
-	}
-
-	inline void writeCLOCK(boolean state)
-	{
-		writePIN(m_clockPin, state);
-	}
+	// input, output pins
+	PinPair m_srqInPin = PinPair(2, 3);
+	PinPair m_atnPin = PinPair(4, 5);
+	PinPair m_resetPin = PinPair(6, 7);
+	PinPair m_clockPin = PinPair(8, 9);
+	PinPair m_dataPin = PinPair(10, 11);
 };
 
 #endif
