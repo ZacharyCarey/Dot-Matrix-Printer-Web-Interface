@@ -7,7 +7,7 @@
 // Mapping of CBM-64's serial port lines to Arduino's digital I/O pins.
 // With Brother HR-5C, we need to be able to read only the data line.
 Okidata120 cbm;
-
+/*
 // For testing:
 int TEST_MODE = -1;
 const int DATA_MAX_LENGTH = 1000;
@@ -55,7 +55,7 @@ void test_menu()
   Serial.println(" (3) Release printer");
   Serial.print("Your selection: > ");
 }
-
+*/
 // Arduino setup function is run once when the sketch starts.
 void setup()
 {
@@ -67,14 +67,14 @@ void setup()
   Serial.println("ready!");
 
   // Print test menu.
-  cbm.println("Hello, world!");
-  test_menu();
+  //cbm.println("Hello, world!");
+  //test_menu();
 }
 
 // Arduino loop function is run over and over again, forever.
 void loop()
 {
-  char val;
+/*  char val;
 
   // Check if data has been sent from the computer.
   if (Serial.available())
@@ -135,5 +135,5 @@ void loop()
       Serial.println("Printer has been released.");
       while(true){}
     }
-  }
+  }*/
 }

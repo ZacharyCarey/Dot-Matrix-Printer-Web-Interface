@@ -5,7 +5,7 @@
 #include <Arduino.h>
 #include "src/iec_driver.h"
 
-enum class PrintMode : int {
+enum class PrintMode : uint8_t {
     Graphic = 0,
     Business = 7
 };
@@ -18,17 +18,31 @@ public:
     }
 
     void begin(PrintMode mode, int printer_addr = 4) {
-        iec.begin(printer_addr);
+        iec.begin();
         iec.sendReset();
 
+        Serial.println("Reset");
+        String message = "Hello, world! This is a test message.\r";
+
         // Initialize CBM communication
-        iec.sendHeader((int)mode);
-    }
+        iec.cmd_Start();
+        iec.cmd_Listen(printer_addr);
+        iec.cmd_Second((uint8_t)mode);
+        iec.cmd_End();
 
-    void end() {
-        iec.end();
-    }
+        //Serial.println("Command sent");
 
+        // Print example data
+        for (int i = 0; i < message.length(); i++)
+        {
+            iec.sendByte(remapCharset(message[i]), i == message.length() - 1, false);
+        }
+        iec.endTransmission();
+
+        Serial.println("Data sent");
+        while(true){};
+    }
+/*
     // Like print, but doesn't attempt to auto-remap unsupported characters. Use at your own risk.
     void write(char c) {
       iec.send(c, false);
@@ -79,7 +93,7 @@ public:
     void setNewline(String newline_char) {
         this->newline = newline_char;
     }
-
+*/
 private:
     IEC iec;
     String newline = "\r";
