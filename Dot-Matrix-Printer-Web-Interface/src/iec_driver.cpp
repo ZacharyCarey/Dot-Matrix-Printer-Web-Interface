@@ -414,7 +414,7 @@ boolean IEC::begin(byte deviceNumber)
 	m_deviceNumber = deviceNumber;
 
 	// make sure the output states are initially LOW.
-	this->m_srqInPin.begin();
+	this->m_srqPin.begin();
 	this->m_atnPin.begin();
 	this->m_resetPin.begin();
 	this->m_clockPin.begin();
@@ -437,6 +437,15 @@ boolean IEC::begin(byte deviceNumber)
 	m_state = noFlags;
 	return true;
 } // init
+
+void IEC::end()
+{
+	this->m_srqPin.write(false);
+	this->m_atnPin.write(false);
+	this->m_resetPin.write(false);
+	this->m_clockPin.write(false);
+	this->m_dataPin.write(false);
+}
 
 #ifdef DEBUGLINES
 void IEC::testINPUTS()

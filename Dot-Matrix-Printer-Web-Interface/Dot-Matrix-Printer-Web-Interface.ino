@@ -6,7 +6,7 @@
 
 // Mapping of CBM-64's serial port lines to Arduino's digital I/O pins.
 // With Brother HR-5C, we need to be able to read only the data line.
-Okidata120 cbm(7, 8, 10, 11);
+Okidata120 cbm;
 
 // For testing:
 int TEST_MODE = -1;
@@ -19,29 +19,29 @@ void printSelfTest() {
   cbm.println();
   for (int i=0; i<16; i++)
   {
-    cbm.write(i+32);
-    cbm.write(' ');
-    cbm.write(i+48);
-    cbm.write(' ');
-    cbm.write(i+64);
-    cbm.write(' ');
-    cbm.write(i+80);
-    cbm.write(' ');
-    cbm.write(i+96);
-    cbm.write(' ');
-    cbm.write(i+112);
+    cbm.print(i+32);
+    cbm.print(' ');
+    cbm.print(i+48);
+    cbm.print(' ');
+    cbm.print(i+64);
+    cbm.print(' ');
+    cbm.print(i+80);
+    cbm.print(' ');
+    cbm.print(i+96);
+    cbm.print(' ');
+    cbm.print(i+112);
     cbm.print("    ");
-    cbm.write(i+160);
-    cbm.write(' ');
-    cbm.write(i+176);
-    cbm.write(' ');
-    cbm.write(i+192);
-    cbm.write(' ');
-    cbm.write(i+200);
-    cbm.write(' ');
-    cbm.write(i+224);
-    cbm.write(' ');
-    cbm.write(i+240);
+    cbm.print(i+160);
+    cbm.print(' ');
+    cbm.print(i+176);
+    cbm.print(' ');
+    cbm.print(i+192);
+    cbm.print(' ');
+    cbm.print(i+200);
+    cbm.print(' ');
+    cbm.print(i+224);
+    cbm.print(' ');
+    cbm.print(i+240);
     cbm.println();
   }
 }
@@ -52,6 +52,7 @@ void test_menu()
   Serial.println("Select printer test mode:");
   Serial.println(" (1) Print self test (charset)");
   Serial.println(" (2) Print user message");
+  Serial.println(" (3) Release printer");
   Serial.print("Your selection: > ");
 }
 
@@ -62,7 +63,7 @@ void setup()
 
   Serial.println("Initializing printer...");
   cbm.begin(PrintMode::Graphic);
-  cbm.setNewline("\r\n");
+  //cbm.setNewline("\r\n");
   Serial.println("ready!");
 
   // Print test menu.
@@ -86,6 +87,7 @@ void loop()
       { // Set test mode
       if (val == '1') TEST_MODE = 1;
       else if (val == '2') TEST_MODE = 2;
+      else if (val == '3') TEST_MODE = 3;
       }
 
     if (TEST_MODE == 1)
@@ -126,6 +128,12 @@ void loop()
           }
         }
       }
+    }
+    else if (TEST_MODE == 3)
+    {
+      cbm.end();
+      Serial.println("Printer has been released.");
+      while(true){}
     }
   }
 }

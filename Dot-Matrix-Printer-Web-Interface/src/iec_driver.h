@@ -28,7 +28,7 @@ public:
 	}
 
 	inline int read() {
-		digitalRead(this->pin_input);
+		return digitalRead(this->pin_input);
 	}
 
 private:
@@ -95,6 +95,8 @@ public:
 	//
 	boolean begin(byte deviceNumber);
 
+	void end();
+
 	// Checks if CBM is sending an attention message. If this is the case,
 	// the message is recieved and stored in atn_cmd.
 	//
@@ -109,6 +111,8 @@ public:
 		delay(100);
 		this->m_resetPin.write(false);
 		delay(3000); // give time for device to reset
+
+		return true;
 	}
 
 	bool sendHeader(byte mode) {
@@ -127,6 +131,8 @@ public:
 		// End header
 		delayMicroseconds(20);
 		this->m_atnPin.write(false);
+
+		return true;
 	}
 
 	// Sends a byte. The communication must be in the correct state: a load command
@@ -163,7 +169,7 @@ private:
 	byte m_deviceNumber;
 
 	// input, output pins
-	PinPair m_srqInPin = PinPair(2, 3);
+	PinPair m_srqPin = PinPair(2, 3);
 	PinPair m_atnPin = PinPair(4, 5);
 	PinPair m_resetPin = PinPair(6, 7);
 	PinPair m_clockPin = PinPair(8, 9);

@@ -13,7 +13,7 @@ enum class PrintMode : int {
 class Okidata120 
 {
 public:
-    Okidata120(int attention_pin, int reset_pin, int clock_pin, int data_pin) 
+    Okidata120() 
     {
     }
 
@@ -23,6 +23,10 @@ public:
 
         // Initialize CBM communication
         iec.sendHeader((int)mode);
+    }
+
+    void end() {
+        iec.end();
     }
 
     // Like print, but doesn't attempt to auto-remap unsupported characters. Use at your own risk.
