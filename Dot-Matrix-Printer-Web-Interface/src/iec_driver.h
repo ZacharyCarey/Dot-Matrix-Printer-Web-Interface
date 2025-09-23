@@ -55,7 +55,8 @@ enum class IECResult : int8_t
 	Failed = -1,
 	Success = 0,
 	AttentionInterrupt = 1,
-	MoreBytes = 2
+	MoreBytes = 2,
+	Timeout = 3
 };
 
 // Return values for checkATN:
@@ -102,45 +103,45 @@ public:
 	// Interrupts the bus (ATN line) to start the transmission of a new command
 	void cmd_Start();
 
-	IECResult cmd_Global(uint8_t cmd)
+	inline IECResult cmd_Global(uint8_t cmd)
 	{
-		return sendByte(cmd & 0x1F, false, false);
+		return send(cmd & 0x1F, false, false);
 	}
 
-	IECResult cmd_Listen(uint8_t addr) 
+	inline IECResult cmd_Listen(uint8_t addr) 
 	{
-		return sendByte(0x20 | (addr & 0x1F), false, false);
+		return send(0x20 | (addr & 0x1F), false, false);
 	}
 
 	// Sets the secondary address, usually used as flags
-	IECResult cmd_Second(uint8_t addr) 
+	inline IECResult cmd_Second(uint8_t addr) 
 	{
-		return sendByte(0x60 | (addr & 0x1F), false, false);
+		return send(0x60 | (addr & 0x1F), false, false);
 	}
 
-	IECResult cmd_Unlisten() 
+	inline IECResult cmd_Unlisten() 
 	{
-		return sendByte(0x3F, false, false);
+		return send(0x3F, false, false);
 	}
 
-	IECResult cmd_Talk(uint8_t addr) 
+	inline IECResult cmd_Talk(uint8_t addr) 
 	{
-		return sendByte(0x40 | (addr & 0x1F), false, false);
+		return send(0x40 | (addr & 0x1F), false, false);
 	}
 
-	IECResult cmd_Untalk() 
+	inline IECResult cmd_Untalk() 
 	{
-		return sendByte(0x5F, false, false);
+		return send(0x5F, false, false);
 	}
 
-	IECResult cmd_Close(uint8_t addr)
+	inline IECResult cmd_Close(uint8_t addr)
 	{
-		return sendByte(0xE0 | (addr & 0x1F), false, false);
+		return send(0xE0 | (addr & 0x1F), false, false);
 	}
 
-	IECResult cmd_Open(uint8_t addr)
+	inline IECResult cmd_Open(uint8_t addr)
 	{
-		return sendByte(0xF0 | (addr & 0x1F), false, false);
+		return send(0xF0 | (addr & 0x1F), false, false);
 	}
 
 	// Releases the ATN line at the end of a command transmission
@@ -157,10 +158,10 @@ public:
 	void sendReset();
 
 	// Sends a single byte and can signal EOI
-	IECResult sendByte(uint8_t data, bool signalEOI, bool checkATN = true);
+	IECResult send(uint8_t data, bool signalEOI, bool checkATN = true);
 	IECResult sendEmptyStream();
 	void endTransmission();
-	IECResult receiveByte(uint8_t* data, bool checkATN = true);
+	IECResult receive(uint8_t* data, bool checkATN = true);
 	IECResult turnAround(bool switchToSender);
 
 private:

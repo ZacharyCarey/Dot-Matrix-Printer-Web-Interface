@@ -53,7 +53,7 @@ IECResult IEC::timeoutWait(PinPair* waitBit, bool waitForSignal, bool checkATN, 
 	uint32_t time = 0;
 	bool state;
 
-	while(time < timeout) {
+	while(/*time < timeout*/1) {
 		// Check for Attention inerrupt
 		if (checkATN && m_atnPin.read())
 		{
@@ -71,14 +71,14 @@ IECResult IEC::timeoutWait(PinPair* waitBit, bool waitForSignal, bool checkATN, 
 		time += 2;
 	}
 
-	return IECResult::Failed;
+	return IECResult::Timeout;
 }
 
 // Assumptions:
 //	Sender (us) is holding CLK logic 1 to indicate not yet ready to send.
 //	Some minimum amount of time has passed to allow listeners to pull DATA high.
 // If signalEOI is false, it is assumed this function will be called again for another byte.
-IECResult IEC::sendByte(uint8_t data, bool signalEOI, bool checkATN)
+IECResult IEC::send(uint8_t data, bool signalEOI, bool checkATN)
 {
 	// Indicate we are ready to send data
 	this->m_clkPin.write(false);
@@ -112,15 +112,12 @@ IECResult IEC::sendByte(uint8_t data, bool signalEOI, bool checkATN)
 
 	// Send bits
 	for(int n = 0; n < 8; n++) {
-		// Clear clock
+		// Data is not valid
 		this->m_clkPin.write(true);
-		delayMicroseconds(TIMING_BIT / 2);
+		delayMicroseconds(TIMING_BIT);
 
-		// set data
+		// set data and pulse clock
 		this->m_dataPin.write((data & 1) ? false : true); // Still not 100% sure why this is flipped.
-		delayMicroseconds(TIMING_BIT / 2);
-
-		// set clock
 		this->m_clkPin.write(false);
 		delayMicroseconds(TIMING_BIT);
 
@@ -135,14 +132,13 @@ IECResult IEC::sendByte(uint8_t data, bool signalEOI, bool checkATN)
 
 	// End transmission
 	this->m_clkPin.write(true); // hold for next byte
-	this->m_dataPin.write(false);
-
-	// Minimum time between multiple bytes
-	delayMicroseconds(/*TIMING_BETWEEN_BYTES*/20);
+	this->m_dataPin.write(false); // Release data lines to be operated by the receivers
 
 	// Wait for receivers to acknowledge data
+	delayMicroseconds(5);
 	timeoutWait(&m_dataPin, true, checkATN);
 
+	// Minimum time between multiple bytes
 	delayMicroseconds(TIMING_BETWEEN_BYTES);
 
 	// Check for Attention inerrupt
@@ -183,7 +179,7 @@ void IEC::endTransmission()
 	this->m_clkPin.write(false);
 }
 
-IECResult IEC::receiveByte(uint8_t* data, bool checkATN)
+IECResult IEC::receive(uint8_t* data, bool checkATN)
 {
 	// Indicate we are ready to read
 	this->m_dataPin.write(false);
@@ -256,15 +252,19 @@ IECResult IEC::receiveByte(uint8_t* data, bool checkATN)
 	} else {
 		return IECResult::MoreBytes;
 	}
-} // receiveByte
+}
 
 void IEC::cmd_Start()
 {
+	// Wait for receiver ready/idle
+	IECResult result = timeoutWait(&m_dataPin, false, false);
+	//if(result != IECResult::Success)
+	//	return;
+
 	// Header begins, write ACK
 	this->m_atnPin.write(true);
-	delayMicroseconds(/*TIMING_ATN_START*/2000);
 	this->m_clkPin.write(true);
-	delayMicroseconds(/*TIMING_ATN_START*/2000);
+	delayMicroseconds(TIMING_ATN_START);
 }
 
 void IEC::cmd_End()
@@ -333,13 +333,13 @@ ATNCheck IEC::checkATN(ATNCmd& cmd, uint8_t m_deviceNumber)
 
 	// Get first ATN byte, it is either LISTEN or TALK
 	ATNCommand c;
-	if(receiveByte((uint8_t*)&c) != IECResult::Success)
+	if(receive((uint8_t*)&c) != IECResult::Success)
 		return ATNCheck::ATN_ERROR;
 
 	if((uint8_t)c == ((uint8_t)ATNCommand::ATN_CODE_LISTEN bitor m_deviceNumber)) {
 		// Okay, we will listen.
 		// Get the first cmd byte, the cmd code
-		if (receiveByte((uint8_t*)&c) != IECResult::Success)
+		if (receive((uint8_t*)&c) != IECResult::Success)
 			return ATNCheck::ATN_ERROR;
 
 		cmd.code = (uint8_t)c;
@@ -354,7 +354,7 @@ ATNCheck IEC::checkATN(ATNCmd& cmd, uint8_t m_deviceNumber)
 		else if(c not_eq ATNCommand::ATN_CODE_UNLISTEN) {
 			// Some other command. Record the cmd string until UNLISTEN is sent
 			for(;;) {
-				if(receiveByte((uint8_t*)&c) != IECResult::Success)
+				if(receive((uint8_t*)&c) != IECResult::Success)
 					return ATNCheck::ATN_ERROR;
 
 				if((m_state bitand atnFlag) and (ATNCommand::ATN_CODE_UNLISTEN == c))
@@ -373,13 +373,13 @@ ATNCheck IEC::checkATN(ATNCmd& cmd, uint8_t m_deviceNumber)
 	else if ((uint8_t)c == ((uint8_t)ATNCommand::ATN_CODE_TALK bitor m_deviceNumber)) {
 		// Okay, we will talk soon, record cmd string while ATN is active
 		// First byte is cmd code, that we CAN at least expect. All else depends on ATN.
-		if(receiveByte((uint8_t*)&c) != IECResult::Success)
+		if(receive((uint8_t*)&c) != IECResult::Success)
 			return ATNCheck::ATN_ERROR;
 		cmd.code = c;
 
 		while(!this->m_atnPin.read()) {
 			if(this->m_clkPin.read()) {
-				if(receiveByte((uint8_t*)&c) != IECResult::Success)
+				if(receive((uint8_t*)&c) != IECResult::Success)
 					return ATNCheck::ATN_ERROR;
 
 				if(i >= ATN_CMD_MAX_LENGTH) {
