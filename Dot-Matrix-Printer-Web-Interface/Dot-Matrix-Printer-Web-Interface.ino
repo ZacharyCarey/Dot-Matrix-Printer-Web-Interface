@@ -17,33 +17,37 @@ int data_index = -1;
 void printSelfTest() {
   cbm.println("Hello World, here are the chars supported by the printer:");
   cbm.println();
+  const uint32_t count = 16*26;
+  char data[count];
   for (int i=0; i<16; i++)
   {
-    cbm.print(i+32);
-    cbm.print(' ');
-    cbm.print(i+48);
-    cbm.print(' ');
-    cbm.print(i+64);
-    cbm.print(' ');
-    cbm.print(i+80);
-    cbm.print(' ');
-    cbm.print(i+96);
-    cbm.print(' ');
-    cbm.print(i+112);
-    cbm.print("    ");
-    cbm.print(i+160);
-    cbm.print(' ');
-    cbm.print(i+176);
-    cbm.print(' ');
-    cbm.print(i+192);
-    cbm.print(' ');
-    cbm.print(i+200);
-    cbm.print(' ');
-    cbm.print(i+224);
-    cbm.print(' ');
-    cbm.print(i+240);
-    cbm.println();
+    int index = 24*i;
+    data[index] = i+32;
+    data[index+1] = ' ';
+    data[index+2] = i+48;
+    data[index+3] = ' ';
+    data[index+4] = i+64;
+    data[index+5] = ' ';
+    data[index+6] = i+80;
+    data[index+7] = ' ';
+    data[index+8] = i+96;
+    data[index+9] = ' ';
+    data[index+10] = i+112;
+    data[index+11] = ' ';
+    data[index+12] = i+160;
+    data[index+13] = ' ';
+    data[index+14] = i+176;
+    data[index+15] = ' ';
+    data[index+16] = i+192;
+    data[index+17] = ' ';
+    data[index+18] = i+200;
+    data[index+19] = ' ';
+    data[index+20] = i+224;
+    data[index+21] = ' ';
+    data[index+22] = i+240;
+    data[index+23] = '\r';
   }
+  cbm.println(data, count);
 }
 
 // For testing, print menu to computer.
@@ -67,8 +71,13 @@ void setup()
   Serial.println("ready!");
 
   // Print test menu.
-  cbm.println("Hello, world!");
-  while(true){}
+  /*for (int i = 0; i < 3; i++) {
+    cbm.println("Hello, world!");
+  }*/
+  cbm.println("Line 1");
+  cbm.println("Line 2");
+  cbm.println("Line 3");
+
   test_menu();
 }
 

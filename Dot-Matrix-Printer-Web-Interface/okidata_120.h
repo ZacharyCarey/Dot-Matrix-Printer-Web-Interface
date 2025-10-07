@@ -3,10 +3,8 @@
 #define OKIDATA_120_H
 
 #include <Arduino.h>
-#include "src/iec_driver.h"
-#include "src/c64_basic.h"
 
-enum class PrintMode : uint8_t {
+enum class PrintMode : char {
     Graphic = 0,
     Business = 7
 };
@@ -22,132 +20,17 @@ public:
         this->mode = mode;
         this->addr = printer_addr;
 
-        iec.begin();
-        iec.sendReset();
-
-        Serial.println("Starting...");
-        String message = "Hello, world! This is a test message.\r";
-
-        IECResult result;
-        LogicalFile printer;
-        if (!LogicalFile::open(&printer, &iec, printer_addr, (uint8_t)mode))
-        {
-            Serial.print("Failed to open printer.");
-            while(1){}
-        }
-
-        for (int i = 0; i < 10; i++)
-        {
-            // Print example data
-            for (int j = 0; j < message.length(); j++)
-            {
-                uint8_t c = remapCharset(message[j]);
-                result = printer.print(&c, 1, (i == 9) && (j + 1 == message.length()));
-                if (result != IECResult::Success)
-                {
-                    Serial.print("Failed to print data: ");
-                    Serial.println((int)result);
-                    while(1){}
-                }
-            }
-            
-        }
-
-        printer.close();
-        Serial.println("Done");
-
-        delay(5000);
-
-        Serial.println("Starting 2...");
-
-        if (!LogicalFile::open(&printer, &iec, printer_addr, (uint8_t)mode))
-        {
-            Serial.print("Failed to open printer2.");
-            while(1){}
-        }
-        uint8_t test_msg[] = { 84, 72, 73, 83, 32, 87, 79, 82, 75, 69, 68, 33, 13 };
-        result = printer.print(test_msg, 13, true);
-        if (result != IECResult::Success)
-        {
-            Serial.print("Failed to print data: ");
-            Serial.println((int)result);
-            while(1){}
-        }
-
-        printer.close();
-        Serial.println("Done2");
-
-        /*for (int i = 0; i < 10; i++)
-        {
-            Serial.print("Print ");
-            Serial.println(i + 1);
-            // Initialize CBM communication
-            iec.cmd_Start();
-            iec.cmd_Listen(printer_addr);
-            iec.cmd_Second((uint8_t)mode);
-            iec.cmd_End();
-
-            // Print example data
-            for (int j = 0; j < message.length(); j++)
-            {
-                iec.send(remapCharset(message[j]), j == message.length() - 1, false);
-            }
-            iec.endTransmission();
-            Serial.println("Done");
-
-            delay(500);
-        }*/
-
-        /*String str = "Hello I need to print this as a test.\r";
-        const char* data = str.c_str();
-        int max_len = str.length();
-
-        Serial.println("Print 2");
-        initializeCBM();
-        for (int i = 0; i < max_len; i++) {
-            if (data[0] == '\0') break;
-            bool lastChar = ((i + 1) == max_len) || (data[1] == '\0');
-            iec.send(remapCharset(data[0]), lastChar);
-            data++;
-        }
-        iec.endTransmission();
-        Serial.println("Done");
-
-        delay(1000);
-
-        data = str.c_str();
-        Serial.println("Print 3");
-        initializeCBM();
-        for (int i = 0; i < max_len; i++) {
-            if (data[0] == '\0') break;
-            bool lastChar = ((i + 1) == max_len) || (data[1] == '\0');
-            iec.send(remapCharset(data[0]), lastChar);
-            data++;
-        }
-        iec.endTransmission();
-        Serial.println("Done");*/
-        while(true){}
+        Serial2.begin(115200, SERIAL_8N1, 19, 20); // rx=19(A2), tx=20(A3)
     }
 
-    void print(char c) {
-        initializeCBM();
-        iec.send(remapCharset(c), true);
-        iec.endTransmission();
-    }
+    bool print(const char* data, int count) {
+        char remap[count];
+        remapCharset(data, remap, count);
 
-    void print(const char* data, int max_len) {
-        if (max_len <= 0 || data[0] == '\0') {
-            return;
-        }
+        bool result = iec_send(remap, count);
 
-        initializeCBM();
-        for (int i = 0; i < max_len; i++) {
-            if (data[0] == '\0') break;
-            bool lastChar = ((i + 1) == max_len) || (data[1] == '\0');
-            iec.send(remapCharset(data[0]), lastChar);
-            data++;
-        }
-        iec.endTransmission();
+        delay(2);
+        return result;
     }
 
     void print(String str) { print(str.c_str(), str.length()); }
@@ -156,24 +39,27 @@ public:
       print(newline.c_str(), newline.length());
     }
 
-    void println(char c) {
-      print(c);
-      print(newline.c_str(), newline.length());
-    }
+    bool println(const char* data, int count) {
+        char remap[count + newline.length()];
+        remapCharset(data, remap, count);
+        remapCharset(newline.c_str(), remap + count, newline.length());
 
-    void println(const char* data, int max_len) {
-        print(data, max_len);
-        print(newline.c_str(), newline.length());
+        bool result = iec_send(remap, count + newline.length());
+
+        delay(2);
+        return result;
     }
 
     void println(String str) { println(str.c_str(), str.length()); }
 
     void setNewline(String newline_char) {
-        this->newline = newline_char;
+        if (newline_char.length() > 0)
+        {
+            this->newline = newline_char;
+        }
     }
 
 private:
-    IEC iec;
     String newline = "\r";
     PrintMode mode;
     int addr;
@@ -187,13 +73,62 @@ private:
             return ' ';
         }
     }
-
-    void initializeCBM()
+    
+    void remapCharset(const char* input, char* output, int count)
     {
-        iec.cmd_Start(); // Make everything listen to us (we are the controller)
-        iec.cmd_Listen(addr); // Tell the printer we want it to listen
-        iec.cmd_Second((uint8_t)mode); // Tell the printer which mode to use
-        iec.cmd_End(); // Finish the command
+        for (int i = 0; i < count; i++) {
+            output[i] = remapCharset(input[i]);
+        }
+    }
+
+    bool iec_send(const char* data, int count)
+    {
+        Serial2.write(0x00);
+        Serial2.write((uint8_t)(count >> 8));
+        Serial2.write((uint8_t)(count & 0xFF));
+
+        uint8_t temp[3];
+        int bytesRead = Serial2.readBytes(temp, 3);
+        if (bytesRead != 3) {
+            Serial.println("IEC did not accept start command.");
+            return false;
+        }
+        if ((temp[0] != 0x00) || (temp[1] != (count >> 8)) || (temp[2] != (count & 0xFF))) 
+        {
+            Serial.println("Invalid IEC confirmation returned.");
+            return false;
+        }
+
+        // Send bytes!
+        Serial2.write(data, count);
+        
+        // Wait for operation complete confirmaiton
+        int timeout = 0;
+        bool finished = false;
+        while (!finished && timeout < 10000)
+        {
+            delay(100);
+            timeout += 100;
+
+            while (Serial2.available() >= 2) {
+                if (Serial2.read() == 0)
+                {
+                    if (Serial2.read() == 0)
+                    {
+                        finished = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!finished)
+        {
+            Serial.println("Did not receive operation complete confirmation.");
+            return false;
+        }
+
+        return true;
     }
 };
 

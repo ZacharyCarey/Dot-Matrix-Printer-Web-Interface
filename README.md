@@ -73,3 +73,4 @@ Also included is the "JLCPCB_BOM" and "JLCPCB_CPL" files that are required for b
 - [Original IEC library](https://github.com/Larswad/uno2iec)
 - [C64 Wiki port info](https://www.c64-wiki.com/wiki/Serial_Port)
 - [C64 IEC API layer](https://www.pagetable.com/?p=1031) and [protocol layer](https://www.pagetable.com/?p=1135)
+- [White paper on IEC timings](https://retro-bobbel.de/zimmers/cbm/programming/serial-bus.pdf)
