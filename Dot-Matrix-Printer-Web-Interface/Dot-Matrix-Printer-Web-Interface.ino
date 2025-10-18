@@ -1,142 +1,94 @@
-//#include <WiFi.h>
-//#include "ESPAsyncWebServer.h"
-//#include "WebSocketsServer.h"
+#include "src/iec_interface.h"
+#include <WiFi.h>
+#include <ESPAsyncWebServer.h>
+#include <WebSocketsServer.h>
+#include "src/index.h"
+#include "wifi_password.h"
 
-#include "okidata_120.h"
+AsyncWebServer server(80);
+WebSocketsServer webSocket(81);
 
-// Mapping of CBM-64's serial port lines to Arduino's digital I/O pins.
-// With Brother HR-5C, we need to be able to read only the data line.
-Okidata120 cbm;
-
-// For testing:
-int TEST_MODE = -1;
-const int DATA_MAX_LENGTH = 1000;
-char data[DATA_MAX_LENGTH];
-int data_index = -1;
-
-void printSelfTest() {
-  cbm.println("Hello World, here are the chars supported by the printer:");
-  cbm.println();
-  const uint32_t count = 16*26;
-  char data[count];
-  for (int i=0; i<16; i++)
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length)
+{
+  switch(type)
   {
-    int index = 24*i;
-    data[index] = i+32;
-    data[index+1] = ' ';
-    data[index+2] = i+48;
-    data[index+3] = ' ';
-    data[index+4] = i+64;
-    data[index+5] = ' ';
-    data[index+6] = i+80;
-    data[index+7] = ' ';
-    data[index+8] = i+96;
-    data[index+9] = ' ';
-    data[index+10] = i+112;
-    data[index+11] = ' ';
-    data[index+12] = i+160;
-    data[index+13] = ' ';
-    data[index+14] = i+176;
-    data[index+15] = ' ';
-    data[index+16] = i+192;
-    data[index+17] = ' ';
-    data[index+18] = i+200;
-    data[index+19] = ' ';
-    data[index+20] = i+224;
-    data[index+21] = ' ';
-    data[index+22] = i+240;
-    data[index+23] = '\r';
-  }
-  cbm.println(data, count);
-}
-
-// For testing, print menu to computer.
-void test_menu()
-{
-  Serial.println("Select printer test mode:");
-  Serial.println(" (1) Print self test (charset)");
-  Serial.println(" (2) Print user message");
-  Serial.println(" (3) Release printer");
-  Serial.print("Your selection: > ");
-}
-
-// Arduino setup function is run once when the sketch starts.
-void setup()
-{
-  Serial.begin(115200);
-
-  Serial.println("Initializing printer...");
-  cbm.begin(PrintMode::Graphic);
-  //cbm.setNewline("\r\n");
-  Serial.println("ready!");
-
-  // Print test menu.
-  /*for (int i = 0; i < 3; i++) {
-    cbm.println("Hello, world!");
-  }*/
-  cbm.println("Line 1");
-  cbm.println("Line 2");
-  cbm.println("Line 3");
-
-  test_menu();
-}
-
-// Arduino loop function is run over and over again, forever.
-void loop()
-{
-  char val;
-
-  // Check if data has been sent from the computer.
-  if (Serial.available())
-  {
-    // Read the most recent byte (which will be from 0 to 255).
-    val = Serial.read();
-    Serial.println(val);
-
-    if (TEST_MODE <= 0)
-      { // Set test mode
-      if (val == '1') TEST_MODE = 1;
-      else if (val == '2') TEST_MODE = 2;
-      }
-
-    if (TEST_MODE == 1)
-    { // If self test mode selected, do self test now.
-      Serial.println("Now printing...");
-      printSelfTest();
-      Serial.println("Done.");
-      TEST_MODE = 0;
-      test_menu();
-    }
-    else if (TEST_MODE == 2)
+    case WStype_DISCONNECTED:
+      Serial.printf("[%u] Disconnected!\n", num);
+      break;
+    case WStype_CONNECTED:
     {
-      if (data_index == -1)
-      { // If user message test mode selected, ask it now.
-        Serial.println("Type text to be printed (# ends):");
-        data_index++;
+      IPAddress ip = webSocket.remoteIP(num);
+      Serial.printf("[%u] Connected from %d.%d.%d.%d\n", num, ip[0], ip[1], ip[2], ip[3]);
+      break;
+    }
+    case WStype_TEXT:
+    {
+      String data = String((char*)payload);
+      if (data == "led_on") {
+        digitalWrite(13, HIGH);
+      } else if (data == "led_off") {
+        digitalWrite(13, LOW);
       }
-      else
-      {
-        if ( val == '#' )
-        {
-          data[data_index] = '\0';
-          cbm.println(data);
-          Serial.println("Done.");
-          data_index = -1;
-          TEST_MODE = 0;
-          test_menu();
-        }
-        else if (data_index < DATA_MAX_LENGTH)
-        {
-          data[data_index] = val;
-          data_index++;
-          if (data_index + 1 >= DATA_MAX_LENGTH)
-          {
-            data[data_index] = '\0';
-            cbm.println(data, DATA_MAX_LENGTH);
-            data_index = 0;
-          }
-        }
-      }
+      break;
     }
   }
+}
+
+float getTemperature() {
+  // temporary random data
+  float temp_x100 = random(0, 10000);
+  return temp_x100 / 100;
+}
+
+void setup() {
+  Serial.begin(115200);
+  iec_init();
+
+  pinMode(13, OUTPUT);
+  digitalWrite(13, LOW);
+
+  // Connect to WiFi
+  Serial.print("Connecting to WiFi...");
+  WiFi.setHostname("esp32");
+  WiFi.begin(wifi_ssid, wifi_password);
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(1000);
+    Serial.print(".");
+  }
+  Serial.println();
+  Serial.println("Connected to WiFi.");
+
+  Serial.print("ESP32 IP: ");
+  Serial.println(WiFi.localIP());
+
+  // Initialize WebSocket server
+  webSocket.begin();
+  webSocket.onEvent(webSocketEvent);
+
+  // Serve the HTML from the file
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
+    Serial.print("ESP32 Web Server: New request received: ");
+    Serial.println("GET /");
+
+    request->send(200, "text/html", webpage);
+  });
+
+  // Define route to get the temperature data
+  server.on("/temperature", HTTP_GET, [](AsyncWebServerRequest* request) {
+    Serial.print("ESP32 Web Server: new request received: ");
+    Serial.println("GET /temperature");
+    float temperature = getTemperature();
+    // Format the temp with 2 decimal places
+    String tempStr = String(temperature, 2);
+    request->send(200, "text/plain", tempStr);
+  });
+
+  // Run the server
+  server.begin();
+}
+
+uint8_t buffer[1000];
+void loop() {
+  webSocket.loop();
 }
