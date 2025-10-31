@@ -52,6 +52,23 @@ btn.onclick = function() {
     }
 };
 
+const textinput = document.getElementById('inputtext');
+const charCountLabel = document.getElementById('charCountLabel');
+function sendText() {
+    // Get the value of the textarea
+    const text = textinput.value;
+    const normalized = text.normalize("NFD");
+    const asciiOnly = normalized.replace(/[^\x00-\x7F]/g, "");
+
+    // Print it to the console
+    //console.log(text);
+    websocket.send(asciiOnly);
+}
+textinput.addEventListener('input', function() {
+    const charCount = textinput.value.length;
+    charCountLabel.textContent = `Characters: ${charCount}`;
+});
+
 fetchTemperature();
 setInterval(fetchTemperature, 4000); // Update temp every 4 seconds
 window.onload = init;

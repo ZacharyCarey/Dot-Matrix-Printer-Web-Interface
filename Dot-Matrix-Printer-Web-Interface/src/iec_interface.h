@@ -22,6 +22,11 @@ void iec_init()
 // Data MUST NOT contain any zeros
 const char* iec_send(uint8_t* data, uint32_t len)
 {
+    if (digitalRead(BUSY_PIN) == true)
+    {
+        return "Printer busy.";
+    }
+
     // Send bytes!
     Serial2.write(data, len);
     Serial2.write(0x00);
@@ -38,10 +43,6 @@ const char* iec_send(uint8_t* data, uint32_t len)
         return "Never received busy signal";
     }
 
-    // Wait for busy signal to end
-    //Serial.print("Waiting for printing to finish...");
-    while (digitalRead(BUSY_PIN) == true){}
-    //Serial.println("Printing done.");
     return nullptr;
 }
 

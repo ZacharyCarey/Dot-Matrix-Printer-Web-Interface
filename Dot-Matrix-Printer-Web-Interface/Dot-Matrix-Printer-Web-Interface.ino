@@ -4,9 +4,23 @@
 #include <WebSocketsServer.h>
 #include "src/index.h"
 #include "wifi_password.h"
+#include "okidata120.h"
 
 AsyncWebServer server(80);
 WebSocketsServer webSocket(81);
+
+#define BUFFER_SIZE 60000
+uint8_t buffer[BUFFER_SIZE];
+
+void print_text(uint8_t* payload, size_t length)
+{
+  size_t bytes = okidata_translate(payload, length, buffer, BUFFER_SIZE);
+  if (bytes > 0)
+    iec_send(buffer, bytes);
+  Serial.print("Sent ");
+  Serial.print(bytes);
+  Serial.println(" to print.");
+}
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length)
 {
@@ -23,11 +37,24 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length)
     }
     case WStype_TEXT:
     {
-      String data = String((char*)payload);
-      if (data == "led_on") {
-        digitalWrite(13, HIGH);
-      } else if (data == "led_off") {
-        digitalWrite(13, LOW);
+      bool should_print = true;
+      if (length <= 7)
+      {
+        String data = String((char*)payload);
+        if (data == "led_on") {
+          digitalWrite(13, HIGH);
+          should_print = false;
+        } else if (data == "led_off") {
+          digitalWrite(13, LOW);
+          should_print = false;
+        }
+      }
+
+      if (should_print)
+      {
+        Serial.print("Received text: ");
+        Serial.println(length);
+        print_text(payload, length);
       }
       break;
     }
@@ -88,7 +115,6 @@ void setup() {
   server.begin();
 }
 
-uint8_t buffer[1000];
 void loop() {
   webSocket.loop();
 }
